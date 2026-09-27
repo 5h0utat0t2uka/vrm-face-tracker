@@ -9,6 +9,9 @@ git-hooks.lib.${system}.run {
     check-added-large-files = {
       enable = true;
       args = [ "--maxkb=500" ];
+      excludes = [
+        "^public/vrm/models/avatar\\.vrm$"
+      ];
     };
     node-tests = {
       enable = true;
@@ -23,18 +26,18 @@ git-hooks.lib.${system}.run {
     #   entry = "${pkgs.biome}/bin/biome check --write --files-ignore-unknown=true --no-errors-on-unmatched";
     #   pass_filenames = true;
     # };
-    # oxfmt = {
-    #   enable = true;
-    #   package = pkgs.oxfmt;
-    #   settings.mode = "write";
-    # };
-    # oxlint = {
-    #   enable = true;
-    #   name = "oxlint";
-    #   package = pkgs.oxlint;
-    #   entry = "${pkgs.oxlint}/bin/oxlint";
-    #   files = "\\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$";
-    # };
+    oxfmt = {
+      enable = true;
+      package = pkgs.oxfmt;
+      settings.mode = "write";
+    };
+    oxlint = {
+      enable = true;
+      name = "oxlint";
+      package = pkgs.oxlint;
+      entry = "${pkgs.oxlint}/bin/oxlint";
+      files = "\\.(js|jsx|mjs|cjs|ts|tsx|mts|cts)$";
+    };
     betterleaks = {
       enable = true;
       name = "betterleaks";
