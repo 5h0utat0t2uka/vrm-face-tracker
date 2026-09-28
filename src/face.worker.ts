@@ -52,13 +52,22 @@ scope.onmessage = async (event: MessageEvent<FaceWorkerRequest>) => {
       const left = scores.get("eyeBlinkLeft");
       const right = scores.get("eyeBlinkRight");
       const jaw = scores.get("jawOpen");
+      // Missing coefficients invalidate the sample instead of inventing a neutral value.
+      const mouthSmile =
+        ((scores.get("mouthSmileLeft") ?? NaN) + (scores.get("mouthSmileRight") ?? NaN)) / 2;
       if (
         left !== undefined &&
         right !== undefined &&
         jaw !== undefined &&
-        [...matrix.data, left, right, jaw].every(Number.isFinite)
+        [...matrix.data, left, right, jaw, mouthSmile].every(Number.isFinite)
       ) {
-        sample = { matrix: matrix.data, blinkLeft: left, blinkRight: right, jawOpen: jaw };
+        sample = {
+          matrix: matrix.data,
+          blinkLeft: left,
+          blinkRight: right,
+          jawOpen: jaw,
+          mouthSmile,
+        };
       }
     }
     const preview = message.preview

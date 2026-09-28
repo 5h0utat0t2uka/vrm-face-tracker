@@ -249,9 +249,16 @@ export default function App() {
 
       {!output && (
         <section className="controls" aria-label="表示設定">
-          <p role="status">
-            {error ? "読み込みエラー" : ready ? "avatar.vrm · 準備完了" : "読み込み中"}
-          </p>
+          <div className="status">
+            <p role="status">
+              <span>Avatar: </span>
+              {error ? "読み込みエラー" : ready ? "読み込み完了" : "読み込み中"}
+            </p>
+            <p role={tracking.phase === "error" ? "alert" : "status"}>
+              <span>Camera: </span>
+              {tracking.message}
+            </p>
+          </div>
           <label htmlFor="camera">カメラ</label>
           <select
             id="camera"
@@ -287,11 +294,6 @@ export default function App() {
             </button>
           </div>
           {deviceError && <p role="alert">{deviceError}</p>}
-          <p role={tracking.phase === "error" ? "alert" : "status"}>{tracking.message}</p>
-          <p className="hint">
-            このアプリでは内蔵カメラを選びます。Zoom・Teamsでは OBS Virtual Camera
-            を選んでください。カメラ変更は停止後に行えます。
-          </p>
           <button
             type="button"
             onClick={() => trackerRef.current?.calibrate()}
@@ -303,8 +305,8 @@ export default function App() {
             {tracking.calibration}
           </p>
 
-          <details>
-            <summary>追跡の調整</summary>
+          {/*<details>
+            <summary>トラッキングの調整</summary>
             <label className="checkbox-label">
               <input
                 type="checkbox"
@@ -335,6 +337,20 @@ export default function App() {
               value={trackingSettings.mouthGain}
               onChange={(event) => updateTracking({ mouthGain: Number(event.target.value) })}
             />
+            <label htmlFor="happy-gain">笑顔の強さ：{trackingSettings.happyGain.toFixed(1)}</label>
+            <input
+              id="happy-gain"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={trackingSettings.happyGain}
+              onChange={(event) => updateTracking({ happyGain: Number(event.target.value) })}
+              aria-describedby="expression-hint"
+            />
+            <p id="expression-hint" className="hint">
+              笑顔は口角の上がりに反応します。強さを0にすると無効化できます。
+            </p>
             <label htmlFor="tracking-fps">推定頻度の上限</label>
             <select
               id="tracking-fps"
@@ -349,7 +365,7 @@ export default function App() {
               推定：{tracking.fps.toFixed(1)} fps / 処理：{Math.round(tracking.inferenceMs)}{" "}
               ms。口形は開閉のみを近似します。
             </p>
-          </details>
+          </details>*/}
 
           <label htmlFor="background">背景色</label>
           <select
@@ -394,6 +410,68 @@ export default function App() {
             <p className="hint">別の独立したアプリ画面を開きます。背景・表示サイズだけを引き継ぎ、カメラや基準値は共有しません。使う場合は現在のカメラを停止してから開き、新しいウィンドウでカメラ開始・基準合わせを行ってください。</p>
             <p className="hint">今のウィンドウをOBSで取り込む場合、この操作は不要です。</p>
           </details>*/}
+
+          <details>
+            <summary>トラッキングの調整</summary>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={trackingSettings.mirror}
+                onChange={(event) => updateTracking({ mirror: event.target.checked })}
+              />
+              鏡像で動かす（左右の向き・ウインク）
+            </label>
+            <label htmlFor="blink-gain">瞬きの強さ：{trackingSettings.blinkGain.toFixed(1)}</label>
+            <input
+              id="blink-gain"
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={trackingSettings.blinkGain}
+              onChange={(event) => updateTracking({ blinkGain: Number(event.target.value) })}
+            />
+            <label htmlFor="mouth-gain">
+              口の開きの強さ：{trackingSettings.mouthGain.toFixed(1)}
+            </label>
+            <input
+              id="mouth-gain"
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={trackingSettings.mouthGain}
+              onChange={(event) => updateTracking({ mouthGain: Number(event.target.value) })}
+            />
+            <label htmlFor="happy-gain">笑顔の強さ：{trackingSettings.happyGain.toFixed(1)}</label>
+            <input
+              id="happy-gain"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={trackingSettings.happyGain}
+              onChange={(event) => updateTracking({ happyGain: Number(event.target.value) })}
+              aria-describedby="expression-hint"
+            />
+            <p id="expression-hint" className="hint">
+              笑顔は口角の上がりに反応します。強さを0にすると無効化できます。
+            </p>
+            <label htmlFor="tracking-fps">推定頻度の上限</label>
+            <select
+              id="tracking-fps"
+              value={trackingSettings.fps}
+              onChange={(event) => updateTracking({ fps: Number(event.target.value) })}
+            >
+              <option value="30">30 fps</option>
+              <option value="20">20 fps</option>
+              <option value="15">15 fps</option>
+            </select>
+            <p className="hint">
+              推定：{tracking.fps.toFixed(1)} fps / 処理：{Math.round(tracking.inferenceMs)}{" "}
+              ms。口形は開閉のみを近似します。
+            </p>
+          </details>
 
           <details open>
             <summary>描画状況</summary>

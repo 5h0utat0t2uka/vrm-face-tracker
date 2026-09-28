@@ -18,7 +18,7 @@ export type TrackingStatus = {
 };
 export const idleTrackingStatus: TrackingStatus = {
   phase: "idle",
-  message: "カメラは停止しています。",
+  message: "停止しています",
   face: false,
   fps: 0,
   inferenceMs: 0,
@@ -35,7 +35,7 @@ function cameraError(error: unknown) {
     if (error.name === "NotReadableError")
       return "カメラを使用できません。他のアプリでの使用状況や接続を確認してください。";
   }
-  return error instanceof Error ? error.message : "カメラを開始できませんでした。";
+  return error instanceof Error ? error.message : "開始できませんでした。";
 }
 
 export function createFaceTracker(
@@ -180,7 +180,9 @@ export function createFaceTracker(
       publish({
         phase: "running",
         face,
-        message: face ? "表情を追跡しています。" : "顔が見つかりません。待機姿勢に戻ります。",
+        message: face
+          ? "表情をトラッキングしています。"
+          : "顔が見つかりません。待機姿勢に戻ります。",
         fps: statsDue ? (resultCount * 1000) / (now - statsStart) : status.fps,
         inferenceMs: result.inferenceMs,
       });
@@ -271,7 +273,7 @@ export function createFaceTracker(
           .forEach((track) =>
             track.addEventListener(
               "ended",
-              () => fail("カメラの接続または使用許可が失われたため停止しました。"),
+              () => fail("接続または使用許可が失われたため停止しました。"),
               { signal: abort.signal },
             ),
           );
