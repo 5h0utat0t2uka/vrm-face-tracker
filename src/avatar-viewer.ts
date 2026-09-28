@@ -93,7 +93,7 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
   const boneRotation = new Quaternion();
   let pose: AvatarPose | null = null;
   let poseTime = -Infinity;
-  const expressions = { blinkLeft: 0, blinkRight: 0, mouth: 0 };
+  const expressions = { blinkLeft: 0, blinkRight: 0, mouth: 0, happy: 0 };
   let viewHeight = 0.65;
   let options: ViewerOptions = { background: "#243449", zoom: 1 };
   let vrm: VRM | null = null;
@@ -163,13 +163,15 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
           .copy(restingNeck)
           .multiply(boneRotation.identity().slerp(smoothedRotation, 0.25));
       // Faster interpolation preserves brief blinks. No automatic blink/lip-sync runs.
-      for (const key of ["blinkLeft", "blinkRight", "mouth"] as const) {
-        const rate = tracked ? (key === "mouth" ? 22 : 45) : 6;
+      for (const key of ["blinkLeft", "blinkRight", "mouth", "happy"] as const) {
+        const rate = tracked ? (key === "happy" ? 8 : key === "mouth" ? 22 : 45) : 6;
         expressions[key] += (targetPose[key] - expressions[key]) * (1 - Math.exp(-rate * delta));
       }
       vrm.expressionManager?.setValue("blinkLeft", expressions.blinkLeft);
       vrm.expressionManager?.setValue("blinkRight", expressions.blinkRight);
       vrm.expressionManager?.setValue("aa", expressions.mouth);
+      // The model's own overrideBlink/overrideMouth rules are applied by vrm.update.
+      vrm.expressionManager?.setValue("happy", expressions.happy);
       vrm.update(delta);
       renderer.render(scene, camera);
     } catch {

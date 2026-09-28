@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Euler, Matrix4, Quaternion, Vector3 } from "three";
-import { defaultTrackingSettings, expressionWeight, FaceRig } from "../src/face-rig.ts";
+import {
+  defaultTrackingSettings,
+  expressionWeight,
+  FaceRig,
+  neutralPose,
+} from "../src/face-rig.ts";
 import type { FaceSample } from "../src/face-protocol.ts";
 
 function sample(x = 0, y = 0, z = 0): FaceSample {
@@ -11,9 +16,11 @@ function sample(x = 0, y = 0, z = 0): FaceSample {
     blinkLeft: 0,
     blinkRight: 0,
     jawOpen: 0,
+    mouthSmile: 0,
   };
 }
-const direct = { ...defaultTrackingSettings, mirror: false };
+// Test the mapping at unit gain independently of the UI's default strengths.
+const direct = { ...defaultTrackingSettings, mirror: false, happyGain: 1 };
 const angles = (rotation: number[]) =>
   new Euler().setFromQuaternion(new Quaternion().fromArray(rotation), "YXZ");
 
@@ -82,4 +89,69 @@ test("invalid matrices are rejected and large angles are clamped", () => {
   assert.ok(Math.abs(actual.x - 0.6) < 1e-6);
   assert.ok(Math.abs(actual.y - 0.9) < 1e-6);
   assert.ok(Math.abs(actual.z + 0.5) < 1e-6);
+});
+
+test("smiling drives happy, while talking alone does not drive happy", () => {
+  const rig = new FaceRig();
+  const speaking = rig.process({ ...sample(), jawOpen: 0.9 }, direct, 0)!;
+  assert.equal(speaking.mouth, 1);
+  assert.equal(speaking.happy, 0);
+  const smiling = rig.process(
+    { ...sample(), mouthSmile: 0.8, blinkLeft: 0.9, jawOpen: 0.5 },
+    direct,
+    100,
+  )!;
+  assert.equal(smiling.happy, 1);
+  assert.equal(smiling.blinkLeft, 1);
+  assert.ok(smiling.mouth > 0);
+});
+
+test("expression calibration removes resting offsets and small neutral fluctuations", () => {
+  const rig = new FaceRig();
+  const input = { ...sample(), mouthSmile: 0.25 };
+  rig.calibrate(0);
+  for (let frame = 0; frame < 30; frame++) rig.process(input, direct, frame * 34);
+  assert.equal(rig.calibrating, false);
+  const pose = rig.process({ ...input, mouthSmile: 0.3 }, direct, 1100)!;
+  assert.equal(pose.happy, 0);
+  assert.ok(rig.process({ ...input, mouthSmile: 0.7 }, direct, 1200)!.happy > 0.9);
+});
+
+test("smile changes and invalid samples interrupt consecutive calibration", () => {
+  for (const interrupted of [
+    { ...sample(), mouthSmile: 0.8 },
+    { ...sample(), mouthSmile: 0.3 },
+    { ...sample(), mouthSmile: NaN },
+  ]) {
+    const rig = new FaceRig();
+    rig.calibrate(0);
+    for (let frame = 0; frame < 29; frame++) rig.process(sample(), direct, frame * 34);
+    rig.process(interrupted, direct, 1000);
+    rig.process(sample(), direct, 1100);
+    assert.equal(rig.calibrating, true);
+    for (let frame = 0; frame < 30; frame++) rig.process(sample(), direct, 1200 + frame * 34);
+    assert.equal(rig.calibrating, false);
+  }
+});
+
+test("happy gain adjusts or disables smile and its weight stays bounded", () => {
+  const rig = new FaceRig();
+  const input = { ...sample(), mouthSmile: 1 };
+  assert.equal(rig.process(input, { ...direct, happyGain: 2 }, 0)!.happy, 1);
+  const noHappy = rig.process(input, { ...direct, happyGain: 0 }, 100)!;
+  assert.equal(noHappy.happy, 0);
+  const partial = { ...sample(), mouthSmile: 0.4 };
+  const normal = rig.process(partial, direct, 300)!;
+  const weak = rig.process(partial, { ...direct, happyGain: 0.5 }, 400)!;
+  assert.ok(weak.happy > 0 && weak.happy < normal.happy);
+  const mirrored = rig.process(partial, { ...direct, mirror: true }, 500)!;
+  assert.equal(mirrored.happy, normal.happy);
+});
+
+test("returning to neutral clears happy and non-finite smile inputs are rejected", () => {
+  const rig = new FaceRig();
+  rig.process({ ...sample(), mouthSmile: 1 }, direct, 0);
+  assert.deepEqual(rig.process(sample(), direct, 100), neutralPose);
+  assert.equal(rig.process({ ...sample(), mouthSmile: NaN }, direct, 200), null);
+  assert.equal(rig.process({ ...sample(), mouthSmile: Infinity }, direct, 200), null);
 });

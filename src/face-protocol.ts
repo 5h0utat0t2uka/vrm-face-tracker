@@ -3,6 +3,7 @@ export type FaceSample = {
   blinkLeft: number;
   blinkRight: number;
   jawOpen: number;
+  mouthSmile: number;
 };
 
 export type FacePoint = { x: number; y: number };
