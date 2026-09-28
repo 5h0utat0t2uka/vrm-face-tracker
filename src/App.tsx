@@ -18,7 +18,7 @@ function initialSettings() {
   return {
     output: params.get("output") === "1",
     background: background?.value ?? backgrounds[0].value,
-    zoom: Number.isFinite(zoom) ? Math.min(1.3, Math.max(0.8, zoom)) : 1,
+    zoom: Number.isFinite(zoom) ? Math.min(2, Math.max(1, zoom)) : 1,
     dedicated: params.get("setup") === "1" || params.get("output") === "1",
   };
 }
@@ -27,7 +27,14 @@ export default function App() {
   const [initial] = useState(initialSettings);
   const [output, setOutput] = useState(initial.output);
   const [background, setBackground] = useState(initial.background);
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
+  const [backgroundImage, setBackgroundImage] = useState<{ file: File; url: string | null } | null>(
+    null,
+  );
+  const [backgroundError, setBackgroundError] = useState("");
+  const [backgroundBlur, setBackgroundBlur] = useState(0);
   const [zoom, setZoom] = useState(initial.zoom);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [tracking, setTracking] = useState(idleTrackingStatus);
   const [trackingSettings, setTrackingSettings] = useState(defaultTrackingSettings);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
@@ -45,8 +52,52 @@ export default function App() {
   const hideButtonRef = useRef<HTMLButtonElement>(null);
   const stageRef = useRef<HTMLElement>(null);
   const viewerRef = useRef<ReturnType<typeof createAvatarViewer> | null>(null);
-  const optionsRef = useRef({ background, zoom });
+  const optionsRef = useRef({ zoom, offsetX: position.x / 100, offsetY: position.y / 100 });
   const active = tracking.phase === "starting" || tracking.phase === "running";
+  const currentBackgroundImage = backgroundImage?.file === backgroundFile ? backgroundImage : null;
+
+  useEffect(() => {
+    if (!backgroundFile) return;
+    const url = URL.createObjectURL(backgroundFile);
+    const image = new Image();
+    let cancelled = false;
+    image.src = url;
+    void image.decode().then(
+      () => {
+        if (!cancelled) setBackgroundImage({ file: backgroundFile, url });
+      },
+      () => {
+        if (!cancelled) setBackgroundImage({ file: backgroundFile, url: null });
+      },
+    );
+    return () => {
+      cancelled = true;
+      image.src = "";
+      URL.revokeObjectURL(url);
+    };
+  }, [backgroundFile]);
+
+  function selectBackground(file: File | undefined) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setBackgroundError("PNG・JPEG・WebPの画像を選択してください。");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setBackgroundError("背景画像は10MB以下にしてください。");
+      return;
+    }
+    setBackgroundError("");
+    setBackgroundImage(null);
+    setBackgroundFile(file);
+  }
+
+  function clearBackground() {
+    setBackgroundFile(null);
+    setBackgroundImage(null);
+    setBackgroundError("");
+    setBackgroundBlur(0);
+  }
 
   async function refreshCameras() {
     try {
@@ -112,9 +163,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    optionsRef.current = { background, zoom };
-    viewerRef.current?.configure({ background, zoom });
-  }, [background, zoom]);
+    const options = { zoom, offsetX: position.x / 100, offsetY: position.y / 100 };
+    optionsRef.current = options;
+    viewerRef.current?.configure(options);
+  }, [zoom, position]);
 
   useEffect(() => {
     trackerRef.current?.configure(trackingSettings);
@@ -182,6 +234,17 @@ export default function App() {
     setTrackingSettings((current) => ({ ...current, ...patch }));
   }
 
+  function moveAvatar(x: number, y: number) {
+    setPosition((current) => ({
+      x: Math.min(50, Math.max(-50, current.x + x)),
+      y: Math.min(50, Math.max(-50, current.y + y)),
+    }));
+  }
+
+  function changeZoom(step: number) {
+    setZoom((current) => Math.min(200, Math.max(100, Math.round(current * 100) + step)) / 100);
+  }
+
   // function openOutput() {
   //   const url = new URL(window.location.href);
   //   url.search = new URLSearchParams({
@@ -210,7 +273,104 @@ export default function App() {
           aria-label="アバタープレビュー"
           style={{ background }}
         >
+          {currentBackgroundImage?.url && (
+            <img
+              className="stage-background"
+              src={currentBackgroundImage.url}
+              alt=""
+              draggable={false}
+              style={{
+                filter: backgroundBlur > 0 ? `blur(${backgroundBlur}px)` : "none",
+                // Extend by three blur radii so the cropped edges remain filled.
+                inset: -backgroundBlur * 3,
+                width: `calc(100% + ${backgroundBlur * 6}px)`,
+                height: `calc(100% + ${backgroundBlur * 6}px)`,
+              }}
+            />
+          )}
           <canvas ref={canvasRef} aria-label="バストアップのVRMアバター" role="img" />
+          {!output && ready && (
+            <div className="view-controls" role="group" aria-label="アバターの表示位置とサイズ">
+              <div className="position-buttons" role="group" aria-label="表示位置（1回で2%移動）">
+                <button
+                  className="move-up"
+                  type="button"
+                  aria-label="アバターを上へ"
+                  title="上へ"
+                  disabled={position.y >= 50}
+                  onClick={() => moveAvatar(0, 2)}
+                >
+                  ↑
+                </button>
+                <button
+                  className="move-left"
+                  type="button"
+                  aria-label="アバターを左へ"
+                  title="左へ"
+                  disabled={position.x <= -50}
+                  onClick={() => moveAvatar(-2, 0)}
+                >
+                  ←
+                </button>
+                <button
+                  className="reset-position"
+                  type="button"
+                  aria-label="表示位置を中央に戻す"
+                  title="位置を中央に戻す"
+                  onClick={() => setPosition({ x: 0, y: 0 })}
+                >
+                  ↺
+                </button>
+                <button
+                  className="move-right"
+                  type="button"
+                  aria-label="アバターを右へ"
+                  title="右へ"
+                  disabled={position.x >= 50}
+                  onClick={() => moveAvatar(2, 0)}
+                >
+                  →
+                </button>
+                <button
+                  className="move-down"
+                  type="button"
+                  aria-label="アバターを下へ"
+                  title="下へ"
+                  disabled={position.y <= -50}
+                  onClick={() => moveAvatar(0, -2)}
+                >
+                  ↓
+                </button>
+              </div>
+              <div
+                className="zoom-buttons"
+                role="group"
+                aria-label="表示サイズ（100〜200%、5%刻み）"
+              >
+                <button
+                  type="button"
+                  aria-label="アバターを拡大"
+                  title="拡大（5%）"
+                  disabled={zoom >= 2}
+                  onClick={() => changeZoom(5)}
+                >
+                  ＋
+                </button>
+                <output aria-label="表示サイズ" aria-live="polite">
+                  {Math.round(zoom * 100)}%
+                </output>
+                <button
+                  type="button"
+                  aria-label="アバターを縮小"
+                  title="縮小（5%）"
+                  disabled={zoom <= 1}
+                  onClick={() => changeZoom(-5)}
+                >
+                  −
+                </button>
+              </div>
+            </div>
+          )}
           {!ready && !error && (
             <p className="stage-message" role="status">
               アバターを読み込んでいます…
@@ -380,16 +540,59 @@ export default function App() {
             ))}
           </select>
 
-          <label htmlFor="zoom">表示サイズ：{Math.round(zoom * 100)}%</label>
-          <input
-            id="zoom"
-            type="range"
-            min="0.8"
-            max="1.3"
-            step="0.01"
-            value={zoom}
-            onChange={(event) => setZoom(Number(event.target.value))}
-          />
+          <div className="actions">
+            <label htmlFor="background-image">背景画像</label>
+            <input
+              id="background-image"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              aria-describedby="background-image-hint"
+              onChange={(event) => {
+                selectBackground(event.currentTarget.files?.[0]);
+                // Allow the same file to be selected again after removal or an error.
+                event.currentTarget.value = "";
+              }}
+            />
+            <p id="background-image-hint" className="hint">
+              PNG・JPEG・WebP、10MB以下。画像は送信・保存せず、再読み込みで解除されます。
+              縦横比を保って全体を埋め、はみ出す部分は切り取ります。
+            </p>
+            {backgroundFile && (
+              <>
+                <p className="hint" role="status">
+                  {!currentBackgroundImage
+                    ? "背景画像を読み込んでいます…"
+                    : currentBackgroundImage.url
+                      ? `選択中：${backgroundFile.name}`
+                      : "画像を読み込めませんでした。別の画像を選択してください。"}
+                </p>
+                <button type="button" onClick={clearBackground}>
+                  背景画像を解除
+                </button>
+              </>
+            )}
+            {backgroundError && (
+              <p className="hint" role="alert">
+                {backgroundError}
+              </p>
+            )}
+            <label htmlFor="background-blur">背景のぼかし：{backgroundBlur}px</label>
+            <input
+              id="background-blur"
+              type="range"
+              min="0"
+              max="20"
+              step="1"
+              value={backgroundBlur}
+              disabled={!currentBackgroundImage?.url}
+              aria-describedby="background-blur-hint"
+              aria-valuetext={backgroundBlur === 0 ? "ぼかしなし" : `${backgroundBlur}px`}
+              onChange={(event) => setBackgroundBlur(Number(event.currentTarget.value))}
+            />
+            <p id="background-blur-hint" className="hint">
+              背景画像だけをぼかします。端の透けを抑えるため、ぼかすほど背景を少し拡大します。
+            </p>
+          </div>
 
           <div className="actions">
             <button
