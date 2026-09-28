@@ -135,28 +135,3 @@ echo '.direnv
 .pre-commit-config.yaml
 .env' >> .gitignore
 ```
-
-## 8. リモートに反映  
-- `dev`にコミットしてプッシュ  
-``` sh
-git add .
-git commit -m "setup project"
-git push -u origin dev
-```
-
-- PR作成後`main`にマージ  
-``` sh
-gh pr create --base main --head dev --fill
-gh pr checks --watch
-gh pr merge --squash --delete-branch
-```
-
-- ローカルをリモートの`main`に揃える  
-``` sh
-git switch main
-git pull --ff-only --prune origin main
-```
-``` sh
-git fetch --prune origin
-git switch -c <branch-name> origin/main
-```

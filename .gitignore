@@ -25,3 +25,5 @@ dist-ssr
 .direnv
 .pre-commit-config.yaml
 .env
+.tmp/
+public/tracking/

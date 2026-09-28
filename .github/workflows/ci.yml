@@ -76,5 +76,9 @@ jobs:
         if: steps.lint-script.outputs.exists == 'true'
         run: pnpm lint
 
+      # public/tracking/ is generated locally and is not checked into Git.
+      - name: Prepare tracking assets
+        run: pnpm setup:tracking
+
       - name: Build
         run: pnpm build

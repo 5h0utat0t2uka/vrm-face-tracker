@@ -5,15 +5,20 @@
   "type": "module",
   "packageManager": "pnpm@10.34.0",
   "scripts": {
-    "dev": "vite",
+    "setup:tracking": "node scripts/prepare-tracking.mjs --download",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "dev": "node scripts/prepare-tracking.mjs && vite",
     "check:pre-commit": "nix develop -c prek run --all-files",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/prepare-tracking.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.0.1",
+    "@pixiv/three-vrm": "^3.5.5",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@babel/core": "^8.0.6",
@@ -22,6 +27,7 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "oxlint": "^1.81.0",
