@@ -1,35 +1,64 @@
-# React + TypeScript + Vite
+# VRM Face Tracker
+![ブラウザでの表示例](./docs/ss1.png.webp)  
+![OBS Virtual Cameraでの表示例](./docs/ss2.png.webp)  
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+内蔵カメラで顔の向き・左右の瞬き・口の開閉を検出し、VRMアバターへ反映するアプリです。OBS Virtual Cameraを経由して、ZoomやMicrosoft Teamsのカメラ映像として利用できます
 
-Currently, two official plugins are available:
+## 動作環境
+macOSの最新版Google Chrome（安定版）と、ブラウザ版のZoom・Teamsで基本動作を確認済み
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## セットアップ
+使用許諾のあるVRMを `public/vrm/models/avatar.vrm` に配置します
+```sh
+nix develop
+pnpm install --frozen-lockfile
+pnpm setup:tracking
+pnpm dev --host 127.0.0.1
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`setup:tracking` は推定モデルのダウンロードとSHA-256検証、WASMの配置を行います。通常は初回のみ必要で、既存モデルは再ダウンロードしません  
+ファイルは `public/tracking/` に生成されます
+
+## 使い方
+1. 内蔵カメラを選び「カメラを開始」を押す
+2. 正面で目を開き、口を閉じて「正面・目・口の基準を合わせる」を押し、完了まで静止
+3. VRMと、その下の実写・ランドマークで動作を確認し、追跡の強さ・背景色・表示サイズを調整
+4. 「UIを隠す」を押し、OBSでこのウィンドウを取り込み、仮想カメラを開始
+5. Zoom・Teamsで「OBS Virtual Camera」と普段のマイクを選択
+
+`Esc` で操作画面に戻り、終了時はWebアプリのカメラとOBSの仮想カメラを停止します  
+> [!IMPORTANT]
+> `Esc` でカメラ映像のプレビューも再表示されるため、会議中の調整は会議側のビデオをオフにしてください
+
+## 制約・プライバシー
+- 描画は30fpsが目標で、最小化・別タブ・別スペースでの継続動作は保証しません
+- 笑顔・細かな口形・視線・全身の追跡は未対応です
+- カメラ映像・検出値はブラウザ内で処理し、Webアプリから送信・保存せず、マイクは取得しません
+- 推定モデルとWASMはアプリと同じ配信元から読み込みます
+- 停止時はカメラと推定処理を終了します
+
+## OBS Studio
+[OBS Studio](https://obsproject.com) をインストールします  
+
+<!--| 操作する場所 | 設定・操作 |
+| :--- | :--- |
+| OBS Studio → Review App Permissions | Screen Recordingを許可。今回OBSのCamera・Microphone権限は不要 |
+| macOSのシステム設定 → 一般 → ログイン項目と機能拡張 → カメラ機能拡張 | OBSを有効にし、OBSを再起動 |
+| Controls → Settings → Video | Base (Canvas) ResolutionとOutput (Scaled) Resolutionを両方 `1920x1080`、Common FPS Valuesを `30` にしてApply → OK |
+| Scenes → ＋ | シーンを作成（例：`VRM会議`） |
+| Sources → ＋ → macOS Screen Capture | Create newでソースを作成（例：`VRMウィンドウ`） |
+| ソースのProperties | MethodをWindow Capture、WindowをChromeの「VRM アバター出力」、Show cursorをオフ |
+| ソースを選択 → Edit → Transform → Edit Transform…（⌘E） | CropのTopなどを調整し、ブラウザのバーを切り抜く |
+| Edit → Transform → Fit to Screen（⌘F） | 切り抜いた映像をキャンバス内に収める |
+| Controls → 仮想カメラ横の歯車 | Output TypeをProgram (Default)にする。今回はStudio Modeをオフにして使用 |
+| Controls → Start Virtual Camera | VRMだけが映っていることを確認して開始。Zoom・TeamsでOBS Virtual Cameraを選択 |
+
+プレビュー全体が見えない場合は、右クリック → **Preview Scaling → Scale to Window** で表示倍率を戻します。これは確認用の倍率で、出力の切り抜きには上記のCropを使います。配信開始・録画開始は不要です。-->
+
+設定項目の公式説明は [macOS画面キャプチャ](https://obsproject.com/kb/macos-screen-capture-source)・[ソースの変形](https://obsproject.com/kb/sources-guide)・[仮想カメラ](https://obsproject.com/kb/virtual-camera-guide) にあります。
+
+
+## Ref
+- [MediaPipe Face Landmarker](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/web_js)
+- [three-vrm](https://github.com/pixiv/three-vrm)
+- [OBS Virtual Camera](https://obsproject.com/kb/virtual-camera-guide)
