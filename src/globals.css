@@ -8,7 +8,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 button, input, select { font: inherit; }
-button, select { min-height: 44px; padding: 6px 12px; }
+button, select { min-height: 32px; padding: 6px 12px; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 :focus-visible { outline: 3px solid #1766b7; outline-offset: 3px; }
@@ -29,7 +29,27 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
 .camera-preview p { margin: 8px 0 0; }
 .stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; align-self: start; }
 .stage:focus { outline: none; }
-.stage canvas { display: block; width: 100%; height: 100%; }
+.stage-background {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; pointer-events: none;
+}
+.stage canvas { position: relative; display: block; width: 100%; height: 100%; }
+.controls input[type="file"] { width: 100%; min-height: 32px; }
+.actions .hint { overflow-wrap: anywhere; }
+.view-controls {
+  position: absolute; right: 8px; bottom: 8px;
+  display: flex; gap: 8px; padding: 4px;
+  color: #202124; background: color-mix(in oklch, white 50%, transparent);; border-radius: 4px;
+}
+.view-controls button { width: 32px; height: 32px; padding: 0; }
+.position-buttons { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; }
+.move-up { grid-area: 1 / 2; }
+.move-left { grid-area: 2 / 1; }
+.reset-position { grid-area: 2 / 2; }
+.move-right { grid-area: 2 / 3; }
+.move-down { grid-area: 3 / 2; }
+.zoom-buttons { display: grid; justify-items: center; align-items: center; gap: 4px; }
+.zoom-buttons output { font-size: 13px; font-variant-numeric: tabular-nums; }
 .stage-message {
   position: absolute;
   top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -73,7 +93,7 @@ dd { margin: 0; font-variant-numeric: tabular-nums; }
   padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 .restore-button:focus-visible {
-  top: 16px; left: 16px; width: auto; height: auto; min-height: 44px;
+  top: 16px; left: 16px; width: auto; height: auto; min-height: 32px;
   padding: 6px 12px; clip-path: none;
 }
 

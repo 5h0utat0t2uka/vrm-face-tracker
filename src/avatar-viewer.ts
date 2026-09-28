@@ -1,6 +1,5 @@
 import {
   Box3,
-  Color,
   DirectionalLight,
   HemisphereLight,
   MathUtils,
@@ -29,7 +28,7 @@ export type ViewerStats = {
   height: number;
 };
 
-type ViewerOptions = { background: string; zoom: number };
+type ViewerOptions = { zoom: number; offsetX: number; offsetY: number };
 type Callbacks = {
   onReady: () => void;
   onError: (message: string) => void;
@@ -66,7 +65,7 @@ function disposeModel(root: Object3D) {
 export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbacks) {
   let renderer: WebGLRenderer;
   try {
-    renderer = new WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true });
   } catch {
     callbacks.onError("3D表示を開始できません。ブラウザのWebGL設定を確認してください。");
     return {
@@ -77,7 +76,8 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
   }
 
   const scene = new Scene();
-  scene.background = new Color("#243449");
+  // The stage supplies the color/image behind the transparent avatar canvas.
+  renderer.setClearColor(0x000000, 0);
   scene.add(new HemisphereLight(0xffffff, 0x8896ae, 2));
   const keyLight = new DirectionalLight(0xffffff, 2.5);
   keyLight.position.set(1, 2, 3);
@@ -95,7 +95,7 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
   let poseTime = -Infinity;
   const expressions = { blinkLeft: 0, blinkRight: 0, mouth: 0, happy: 0 };
   let viewHeight = 0.65;
-  let options: ViewerOptions = { background: "#243449", zoom: 1 };
+  let options: ViewerOptions = { zoom: 1, offsetX: 0, offsetY: 0 };
   let vrm: VRM | null = null;
   let modelRoot: Object3D | null = null;
   let disposed = false;
@@ -117,7 +117,16 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
     camera.position.set(target.x, target.y, target.z + distance);
     camera.lookAt(target);
     camera.zoom = options.zoom;
-    camera.updateProjectionMatrix();
+    // Shift the projection in screen proportions; preserve pose and lighting.
+    // Positive offsets move the avatar right/up, including after a resize or zoom.
+    camera.setViewOffset(
+      camera.aspect,
+      1,
+      -options.offsetX * camera.aspect,
+      options.offsetY,
+      camera.aspect,
+      1,
+    );
   }
 
   function resize() {
@@ -268,7 +277,6 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
   return {
     configure(next: ViewerOptions) {
       options = next;
-      (scene.background as Color).set(next.background);
       frameCamera();
     },
     setPose(next: AvatarPose | null) {
