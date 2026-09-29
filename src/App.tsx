@@ -45,6 +45,7 @@ export default function App() {
   const [backgroundBlur, setBackgroundBlur] = useState(0);
   const [zoom, setZoom] = useState(initial.zoom);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [showBones, setShowBones] = useState(false);
   const [tracking, setTracking] = useState(idleTrackingStatus);
   const [trackingSettings, setTrackingSettings] = useState(defaultTrackingSettings);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
@@ -81,7 +82,12 @@ export default function App() {
   const hideButtonRef = useRef<HTMLButtonElement>(null);
   const stageRef = useRef<HTMLElement>(null);
   const viewerRef = useRef<ReturnType<typeof createAvatarViewer> | null>(null);
-  const optionsRef = useRef({ zoom, offsetX: position.x / 100, offsetY: position.y / 100 });
+  const optionsRef = useRef({
+    zoom,
+    offsetX: position.x / 100,
+    offsetY: position.y / 100,
+    showBones: showBones && !output,
+  });
   const active = tracking.phase === "starting" || tracking.phase === "running";
   const currentBackgroundImage = backgroundImage?.file === backgroundFile ? backgroundImage : null;
 
@@ -224,11 +230,16 @@ export default function App() {
     };
   }, [appendStatusLog]);
 
-  useEffect(() => {
-    const options = { zoom, offsetX: position.x / 100, offsetY: position.y / 100 };
+  useLayoutEffect(() => {
+    const options = {
+      zoom,
+      offsetX: position.x / 100,
+      offsetY: position.y / 100,
+      showBones: showBones && !output,
+    };
     optionsRef.current = options;
     viewerRef.current?.configure(options);
-  }, [zoom, position]);
+  }, [zoom, position, showBones, output]);
 
   useEffect(() => {
     trackerRef.current?.configure(trackingSettings);
@@ -697,6 +708,19 @@ export default function App() {
 
           <details>
             <summary>描画状況</summary>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={showBones}
+                disabled={!ready}
+                aria-describedby="bones-hint"
+                onChange={(event) => setShowBones(event.target.checked)}
+              />
+              ボーンを表示（デバッグ）
+            </label>
+            <p id="bones-hint" className="hint">
+              ボーンをアバターに重ねて表示します。「UIを隠す」ではボーンも非表示になります。
+            </p>
             <dl>
               <div>
                 <dt>VRM描画fps / 目標</dt>

@@ -1,5 +1,6 @@
 import {
   Box3,
+  Color,
   DirectionalLight,
   HemisphereLight,
   MathUtils,
@@ -8,6 +9,7 @@ import {
   Quaternion,
   Scene,
   ShaderMaterial,
+  SkeletonHelper,
   Texture,
   Vector2,
   Vector3,
@@ -28,7 +30,7 @@ export type ViewerStats = {
   height: number;
 };
 
-type ViewerOptions = { zoom: number; offsetX: number; offsetY: number };
+type ViewerOptions = { zoom: number; offsetX: number; offsetY: number; showBones: boolean };
 type Callbacks = {
   onReady: () => void;
   onError: (message: string) => void;
@@ -91,12 +93,21 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
   const smoothedRotation = new Quaternion();
   const targetRotation = new Quaternion();
   const boneRotation = new Quaternion();
+  const breathingBones: {
+    bone: Object3D;
+    resting: Quaternion;
+    axis: Vector3;
+    maxAngle: number;
+  }[] = [];
+  let breathingStart: number | null = null;
+  const breathingPeriodMs = 4800;
   let pose: AvatarPose | null = null;
   let poseTime = -Infinity;
   const expressions = { blinkLeft: 0, blinkRight: 0, mouth: 0, happy: 0 };
   let viewHeight = 0.65;
-  let options: ViewerOptions = { zoom: 1, offsetX: 0, offsetY: 0 };
+  let options: ViewerOptions = { zoom: 1, offsetX: 0, offsetY: 0, showBones: false };
   let vrm: VRM | null = null;
+  let skeletonHelper: SkeletonHelper | null = null;
   let modelRoot: Object3D | null = null;
   let disposed = false;
   let failed = false;
@@ -157,6 +168,17 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
     maxGapMs = Math.max(maxGapMs, gap);
     const delta = Math.min(gap / 1000, 0.05);
     try {
+      if (breathingStart === null) breathingStart = now;
+      const phase =
+        (((now - breathingStart) % breathingPeriodMs) / breathingPeriodMs) * Math.PI * 2;
+      // Ease from the resting pose to the maximum and back once per breath.
+      const breath = (1 - Math.cos(phase)) / 2;
+      for (const { bone, resting, axis, maxAngle } of breathingBones) {
+        // Always rebuild from the saved pose; never accumulate rotation across frames.
+        bone.quaternion
+          .copy(resting)
+          .multiply(boneRotation.setFromAxisAngle(axis, maxAngle * breath));
+      }
       const head = vrm.humanoid.getNormalizedBoneNode("head");
       const neck = vrm.humanoid.getNormalizedBoneNode("neck");
       const tracked = pose !== null && now - poseTime < 500;
@@ -239,8 +261,52 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
       if (!(loaded instanceof VRM)) throw new Error("No VRM model found");
       vrm = loaded;
       VRMUtils.rotateVRM0(vrm);
-      vrm.humanoid.getNormalizedBoneNode("leftUpperArm")?.rotation.set(0, 0, -1.1);
-      vrm.humanoid.getNormalizedBoneNode("rightUpperArm")?.rotation.set(0, 0, 1.1);
+      const armAngle = MathUtils.degToRad(78);
+      vrm.humanoid.getNormalizedBoneNode("leftUpperArm")?.rotation.set(0, 0, -armAngle);
+      vrm.humanoid.getNormalizedBoneNode("rightUpperArm")?.rotation.set(0, 0, armAngle);
+      // Apply a relaxed hand pose once at load, with mirrored curl directions.
+      for (const side of ["left", "right"] as const) {
+        const curlSign = side === "left" ? -1 : 1;
+        for (const [finger, proximal, intermediate, distal] of [
+          ["Index", 12, 18, 8],
+          ["Middle", 15, 20, 10],
+          ["Ring", 18, 23, 12],
+          ["Little", 20, 25, 12],
+        ] as const) {
+          for (const [joint, degrees] of [
+            ["Proximal", proximal],
+            ["Intermediate", intermediate],
+            ["Distal", distal],
+          ] as const) {
+            const bone = vrm.humanoid.getNormalizedBoneNode(`${side}${finger}${joint}`);
+            if (bone) bone.rotation.z = curlSign * MathUtils.degToRad(degrees);
+          }
+        }
+        // The thumb closes across the palm on a different axis from the other fingers.
+        for (const [joint, degrees] of [
+          ["Metacarpal", 5],
+          ["Proximal", 8],
+          ["Distal", 6],
+        ] as const) {
+          const bone = vrm.humanoid.getNormalizedBoneNode(`${side}Thumb${joint}`);
+          if (bone) bone.rotation.y = -curlSign * MathUtils.degToRad(degrees);
+        }
+      }
+      for (const [name, axis, degrees] of [
+        ["chest", new Vector3(1, 0, 0), -0.9],
+        ["leftShoulder", new Vector3(0, 0, 1), 0.85],
+        ["rightShoulder", new Vector3(0, 0, 1), -0.85],
+      ] as const) {
+        const bone = vrm.humanoid.getNormalizedBoneNode(name);
+        if (bone) {
+          breathingBones.push({
+            bone,
+            resting: bone.quaternion.clone(),
+            axis,
+            maxAngle: MathUtils.degToRad(degrees),
+          });
+        }
+      }
       vrm.scene.traverse((object) => {
         object.frustumCulled = false;
       });
@@ -259,15 +325,29 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
       if (normalizedHead) restingHead.copy(normalizedHead.quaternion);
       const normalizedNeck = vrm.humanoid.getNormalizedBoneNode("neck");
       if (normalizedNeck) restingNeck.copy(normalizedNeck.quaternion);
+      const hips = vrm.humanoid.getRawBoneNode("hips");
+      if (hips) {
+        // Visualize the actual deforming bones, excluding the separate normalized rig.
+        skeletonHelper = new SkeletonHelper(hips);
+        skeletonHelper.setColors(new Color(0xff00ff), new Color(0x00ffff));
+        // SkeletonHelper disables depth testing so bones remain visible through the body.
+        skeletonHelper.renderOrder = Infinity;
+        skeletonHelper.frustumCulled = false;
+        if (options.showBones) scene.add(skeletonHelper);
+      }
       frameCamera();
       renderer.render(scene, camera);
       callbacks.onReady();
       animationId = requestAnimationFrame(animate);
     } catch {
       if (!disposed) {
+        skeletonHelper?.removeFromParent();
+        skeletonHelper?.dispose();
+        skeletonHelper = null;
         if (modelRoot) disposeModel(modelRoot);
         modelRoot = null;
         vrm = null;
+        breathingBones.length = 0;
         fail("アバターを読み込めませんでした。public/vrm/models/avatar.vrm を確認してください。");
       }
     }
@@ -276,8 +356,16 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
 
   return {
     configure(next: ViewerOptions) {
+      if (disposed || failed) return;
+      const bonesChanged = options.showBones !== next.showBones;
       options = next;
       frameCamera();
+      if (skeletonHelper && bonesChanged) {
+        if (options.showBones) scene.add(skeletonHelper);
+        else skeletonHelper.removeFromParent();
+        // Clear debug pixels immediately when switching to the output-only layout.
+        renderer.render(scene, camera);
+      }
     },
     setPose(next: AvatarPose | null) {
       pose = next;
@@ -292,9 +380,13 @@ export function createAvatarViewer(canvas: HTMLCanvasElement, callbacks: Callbac
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("webglcontextlost", onContextLost);
+      skeletonHelper?.removeFromParent();
+      skeletonHelper?.dispose();
+      skeletonHelper = null;
       if (modelRoot) disposeModel(modelRoot);
       modelRoot = null;
       vrm = null;
+      breathingBones.length = 0;
       renderer.dispose();
     },
   };
