@@ -5,7 +5,7 @@ import { defaultTrackingSettings } from "./face-rig";
 import type { TrackingSettings } from "./face-rig";
 import { drawCameraPreview } from "./camera-preview";
 
-const defaultBackground = "#00b140";
+const defaultBackground = "#00FF00";
 const logTimeFormat = new Intl.DateTimeFormat("ja-JP", {
   hour: "2-digit",
   minute: "2-digit",
@@ -60,7 +60,7 @@ export default function App() {
     const time = logTimeFormat.format(now);
     const dateTime = now.toISOString();
     return [
-      { id: 1, time, dateTime, source: "Avatar", message: "VRM読み込み中", error: false },
+      { id: 1, time, dateTime, source: "Avatar", message: "VRM読み込み中…", error: false },
       {
         id: 2,
         time,
@@ -197,7 +197,7 @@ export default function App() {
         viewer = createAvatarViewer(canvas, {
           onReady: () => {
             setReady(true);
-            appendStatusLog("Avatar", "VRM読み込み完了");
+            appendStatusLog("Avatar", "VRM読み込み完了。");
           },
           onError: (message) => {
             trackerRef.current?.stop();
@@ -253,7 +253,7 @@ export default function App() {
   }, [output]);
 
   useEffect(() => {
-    document.title = output || initial.dedicated ? "VRM アバター出力" : "VRM Face Tracker";
+    document.title = output || initial.dedicated ? "VRMアバター出力" : "VRM Face Tracker";
     // Move focus off the removed controls without displaying an overlay in OBS.
     if (output) stageRef.current?.focus({ preventScroll: true });
     else hideButtonRef.current?.focus({ preventScroll: true });
@@ -542,75 +542,16 @@ export default function App() {
             {tracking.calibration}
           </p>
 
-          {/*<details>
-            <summary>トラッキングの調整</summary>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={trackingSettings.mirror}
-                onChange={(event) => updateTracking({ mirror: event.target.checked })}
-              />
-              鏡像で動かす（左右の向き・ウインク）
-            </label>
-            <label htmlFor="blink-gain">瞬きの強さ：{trackingSettings.blinkGain.toFixed(1)}</label>
-            <input
-              id="blink-gain"
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={trackingSettings.blinkGain}
-              onChange={(event) => updateTracking({ blinkGain: Number(event.target.value) })}
-            />
-            <label htmlFor="mouth-gain">
-              口の開きの強さ：{trackingSettings.mouthGain.toFixed(1)}
-            </label>
-            <input
-              id="mouth-gain"
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={trackingSettings.mouthGain}
-              onChange={(event) => updateTracking({ mouthGain: Number(event.target.value) })}
-            />
-            <label htmlFor="happy-gain">笑顔の強さ：{trackingSettings.happyGain.toFixed(1)}</label>
-            <input
-              id="happy-gain"
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={trackingSettings.happyGain}
-              onChange={(event) => updateTracking({ happyGain: Number(event.target.value) })}
-              aria-describedby="expression-hint"
-            />
-            <p id="expression-hint" className="hint">
-              笑顔は口角の上がりに反応します。強さを0にすると無効化できます。
-            </p>
-            <label htmlFor="tracking-fps">推定頻度の上限</label>
-            <select
-              id="tracking-fps"
-              value={trackingSettings.fps}
-              onChange={(event) => updateTracking({ fps: Number(event.target.value) })}
-            >
-              <option value="30">30 fps</option>
-              <option value="20">20 fps</option>
-              <option value="15">15 fps</option>
-            </select>
-            <p className="hint">
-              推定：{tracking.fps.toFixed(1)} fps / 処理：{Math.round(tracking.inferenceMs)}{" "}
-              ms。口形は開閉のみを近似します。
-            </p>
-          </details>*/}
-
           <label htmlFor="background">背景色</label>
-          <input
-            id="background"
-            type="color"
-            value={background}
-            onChange={(event) => setBackground(event.target.value)}
-          />
+          <div className="color">
+            <input
+              id="background"
+              type="color"
+              value={background}
+              onChange={(event) => setBackground(event.target.value)}
+            />
+            <output id="background">{background}</output>
+          </div>
 
           <div className="actions">
             <label htmlFor="background-image">背景画像</label>

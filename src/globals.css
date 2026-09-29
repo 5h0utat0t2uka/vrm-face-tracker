@@ -30,7 +30,9 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
 .previews { min-inline-size: 0; }
 .camera-preview {
   margin-block-start: 16px;
-  display: grid;
+  &:not([hidden]) {
+    display: grid;
+  }
   > * {
     grid-area: 1/-1;
   }
@@ -38,8 +40,10 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
 .camera-preview h2 { font-size: 16px; margin: 0 0 8px; }
 .camera-preview canvas { display: block; inline-size: 100%; block-size: auto; background: #111; }
 .camera-preview p {
-  margin: 1em;
+  /*margin: 1em;*/
   place-self: center;
+  text-align: center;
+  font-size: 12px;
   color: white;
 }
 .stage { position: relative; inline-size: 100%; aspect-ratio: 16 / 9; overflow: hidden; align-self: start; }
@@ -62,8 +66,18 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
     cursor: pointer;
   }
 }
-
-.controls input[type="color"] { inline-size: 100%; block-size: 44px; padding: 4px; cursor: pointer; }
+.controls .color {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  justify-content: space-between;
+  output {
+    font-family: ui-monospace;
+  }
+}
+/*.controls input[type="color"] {
+  cursor: pointer;
+}*/
 .actions .hint { overflow-wrap: anywhere; }
 .view-controls {
   position: absolute; inset-inline-end: 8px; inset-block-end: 8px;
@@ -83,7 +97,7 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
   position: absolute;
   inset-block-start: 50%; inset-inline-start: 50%; transform: translate(-50%, -50%);
   inline-size: min(90%, 420px); margin: 0; padding: 16px;
-  color: #202124; background: #fff; text-align: center;
+  color: white; text-align: center; font-size: 12px;
 }
 .stage-message p { margin: 0 0 12px; }
 

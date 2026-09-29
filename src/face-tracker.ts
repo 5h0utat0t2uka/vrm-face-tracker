@@ -18,7 +18,7 @@ export type TrackingStatus = {
 };
 export const idleTrackingStatus: TrackingStatus = {
   phase: "idle",
-  message: "カメラは停止しています",
+  message: "カメラは停止しています。",
   face: false,
   fps: 0,
   inferenceMs: 0,
@@ -29,11 +29,11 @@ export const idleTrackingStatus: TrackingStatus = {
 function cameraError(error: unknown) {
   if (error instanceof DOMException) {
     if (error.name === "NotAllowedError")
-      return "カメラの使用が許可されていません。ブラウザとmacOSのカメラ権限を確認してください。";
+      return "カメラの使用が許可されていません、ブラウザとmacOSのカメラ権限を確認してください。";
     if (error.name === "NotFoundError" || error.name === "OverconstrainedError")
-      return "選択したカメラが見つかりません。カメラ一覧を更新して選び直してください。";
+      return "選択したカメラが見つかりません、カメラ一覧を更新して選び直してください。";
     if (error.name === "NotReadableError")
-      return "カメラを使用できません。他のアプリでの使用状況や接続を確認してください。";
+      return "カメラを使用できません、他のアプリでの使用状況や接続を確認してください。";
   }
   return error instanceof Error ? error.message : "カメラを開始できませんでした。";
 }
@@ -119,7 +119,7 @@ export function createFaceTracker(
       const timeout = window.setTimeout(
         () =>
           finish(
-            new Error("顔検出の準備がタイムアウトしました。推定用ファイルを確認してください。"),
+            new Error("顔検出の準備がタイムアウトしました、推定用ファイルを確認してください。"),
           ),
         30000,
       );
@@ -132,7 +132,7 @@ export function createFaceTracker(
       }
       abort.signal.addEventListener("abort", onAbort, { once: true });
       worker!.onerror = () =>
-        finish(new Error("顔検出のWorkerを起動できませんでした。再読み込みしてください。"));
+        finish(new Error("顔検出のWorkerを起動できませんでした、再読み込みしてください。"));
       worker!.onmessage = (event: MessageEvent<FaceWorkerResponse>) => {
         if (event.data.type === "ready") {
           connections = event.data.connections;
@@ -182,7 +182,7 @@ export function createFaceTracker(
         face,
         message: face
           ? "表情をトラッキングしています。"
-          : "顔が見つかりません。待機姿勢に戻ります。",
+          : "顔が見つからないため待機姿勢に戻ります。",
         fps: statsDue ? (resultCount * 1000) / (now - statsStart) : status.fps,
         inferenceMs: result.inferenceMs,
       });
@@ -298,7 +298,7 @@ export function createFaceTracker(
         if (stopped) return;
         worker.onmessage = receive;
         worker.onerror = () =>
-          fail("顔検出のWorkerが停止したためカメラを解放しました。再度開始してください。");
+          fail("顔検出のWorkerが停止したためカメラを解放しました、再度開始してください。");
         worker.onmessageerror = () => fail("顔検出の結果を受信できないため停止しました。");
         lastResult = statsStart = performance.now();
         publish({ phase: "running", message: "顔を探しています…" });
@@ -316,7 +316,7 @@ export function createFaceTracker(
           }
           if (age > 15000)
             fail(
-              "カメラ映像または顔検出の更新が止まったため停止しました。出力ウィンドウを表示して再開してください。",
+              "カメラ映像または顔検出の更新が止まったため停止しました、出力ウィンドウを表示して再開してください。",
             );
         }, 500);
         void capture();
