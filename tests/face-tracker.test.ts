@@ -130,4 +130,39 @@ test("video playback failure also releases the camera", async () => {
   await tracker().start("");
   assert.equal(stoppedTracks, 1);
   assert.equal(fakeVideo.srcObject, null);
+  assert.match(statuses.at(-1)!.message, /映像の再生に失敗/);
+  assert.match(statuses.at(-1)!.message, /Playback failed/);
+});
+
+test("playback denial is distinguished from camera permission denial", async () => {
+  permission = async () => stream();
+  fakeVideo.play = async () => {
+    throw new DOMException("Playback denied", "NotAllowedError");
+  };
+  await tracker().start("");
+  assert.equal(statuses.at(-1)!.phase, "error");
+  assert.match(statuses.at(-1)!.message, /映像の再生が許可されていません/);
+  assert.doesNotMatch(statuses.at(-1)!.message, /カメラの使用が許可/);
+  assert.ok(statuses.some((status) => status.message.includes("カメラを取得しました")));
+  assert.equal(stoppedTracks, 1);
+  assert.equal(fakeVideo.srcObject, null);
+});
+
+test("worker startup denial is distinguished from camera permission denial", async () => {
+  permission = async () => stream();
+  Object.defineProperty(globalThis, "Worker", {
+    configurable: true,
+    value: class {
+      constructor() {
+        throw new DOMException("Worker denied", "NotAllowedError");
+      }
+    },
+  });
+  await tracker().start("");
+  assert.equal(statuses.at(-1)!.phase, "error");
+  assert.match(statuses.at(-1)!.message, /顔検出の準備に失敗/);
+  assert.match(statuses.at(-1)!.message, /Worker denied/);
+  assert.doesNotMatch(statuses.at(-1)!.message, /カメラの使用が許可/);
+  assert.equal(stoppedTracks, 1);
+  assert.equal(fakeVideo.srcObject, null);
 });

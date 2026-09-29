@@ -19,8 +19,8 @@ export type TrackingSettings = {
 export const defaultTrackingSettings: TrackingSettings = {
   mirror: true,
   blinkGain: 1,
-  mouthGain: 1,
-  happyGain: 0.4,
+  mouthGain: 1.5,
+  happyGain: 0.3,
   fps: 30,
 };
 export const neutralPose: AvatarPose = {

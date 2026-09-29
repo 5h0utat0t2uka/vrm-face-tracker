@@ -3,12 +3,14 @@
   color: #202124;
   background: #f5f5f5;
   line-height: 1.6;
+  container-type: inline-size;
+  container-name: root;
 }
 
 * { box-sizing: border-box; }
 body { margin: 0; }
 button, input, select { font: inherit; }
-button, select { min-height: 32px; padding: 6px 12px; }
+button, select { min-block-size: 32px; padding: 6px 12px; }
 button, summary { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 :focus-visible { outline: 3px solid #1766b7; outline-offset: 3px; }
@@ -17,31 +19,58 @@ button:disabled { cursor: not-allowed; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 24px;
-  max-width: 1600px;
+  max-inline-size: 1600px;
   margin-inline: auto;
   padding: 24px;
+  @container root (inline-size < 800px) {
+    grid-template-columns: 1fr;
+  }
 }
 h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
-.previews { min-width: 0; }
-.camera-preview { margin-top: 16px; }
+.previews { min-inline-size: 0; }
+.camera-preview {
+  margin-block-start: 16px;
+  display: grid;
+  > * {
+    grid-area: 1/-1;
+  }
+}
 .camera-preview h2 { font-size: 16px; margin: 0 0 8px; }
-.camera-preview canvas { display: block; width: 100%; height: auto; background: #111; }
-.camera-preview p { margin: 8px 0 0; }
-.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; align-self: start; }
+.camera-preview canvas { display: block; inline-size: 100%; block-size: auto; background: #111; }
+.camera-preview p {
+  margin: 1em;
+  place-self: center;
+  color: white;
+}
+.stage { position: relative; inline-size: 100%; aspect-ratio: 16 / 9; overflow: hidden; align-self: start; }
 .stage:focus { outline: none; }
 .stage-background {
-  position: absolute; inset: 0; width: 100%; height: 100%;
+  position: absolute; inset: 0; inline-size: 100%; block-size: 100%;
   object-fit: cover; pointer-events: none;
 }
-.stage canvas { position: relative; display: block; width: 100%; height: 100%; }
-.controls input[type="file"] { width: 100%; min-height: 32px; }
+.stage canvas { position: relative; display: block; inline-size: 100%; block-size: 100%; }
+.controls input[type="file"] {
+  inline-size: 100%;
+  min-block-size: 32px;
+  &::file-selector-button {
+    padding: 0.25em 0.75em;
+    border: 1px solid ButtonBorder;
+    border-radius: 4px;
+    background-color: ButtonFace;
+    color: ButtonText;
+    font: inherit;
+    cursor: pointer;
+  }
+}
+
+.controls input[type="color"] { inline-size: 100%; block-size: 44px; padding: 4px; cursor: pointer; }
 .actions .hint { overflow-wrap: anywhere; }
 .view-controls {
-  position: absolute; right: 8px; bottom: 8px;
+  position: absolute; inset-inline-end: 8px; inset-block-end: 8px;
   display: flex; gap: 8px; padding: 4px;
-  color: #202124; background: color-mix(in oklch, white 50%, transparent);; border-radius: 4px;
+  color: #202124; background: color-mix(in oklch, white 50%, transparent); border-radius: 4px;
 }
-.view-controls button { width: 32px; height: 32px; padding: 0; }
+.view-controls button { inline-size: 32px; block-size: 32px; padding: 0; }
 .position-buttons { display: grid; grid-template-columns: repeat(3, 32px); gap: 4px; }
 .move-up { grid-area: 1 / 2; }
 .move-left { grid-area: 2 / 1; }
@@ -52,8 +81,8 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
 .zoom-buttons output { font-size: 13px; font-variant-numeric: tabular-nums; }
 .stage-message {
   position: absolute;
-  top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: min(90%, 420px); margin: 0; padding: 16px;
+  inset-block-start: 50%; inset-inline-start: 50%; transform: translate(-50%, -50%);
+  inline-size: min(90%, 420px); margin: 0; padding: 16px;
   color: #202124; background: #fff; text-align: center;
 }
 .stage-message p { margin: 0 0 12px; }
@@ -62,41 +91,70 @@ h1 { grid-column: 1 / -1; font-size: 20px; margin: 0; }
   display: grid;
   grid-template-columns: 1fr;
   gap: 8px;
-  margin-block-end: 24px;
+  place-content: start;
+  margin-block-end: 12px;
   padding: 12px;
   border: 1px solid #ccc;
   border-radius: 6px;
+  /*block-size: max-content;*/
+  /*max-block-size: 100px;*/
+  block-size: 100px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
   p {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1em;
     font-size: 12px;
     font-family: ui-monospace;
   }
+  time {
+    grid-template-columns: 1fr;
+    color: #ccc;
+  }
 }
-.controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.status time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.status .status-error { color: #a11212; }
+.controls { display: flex; flex-direction: column; gap: 12px; min-inline-size: 0; }
 .controls p { margin: 0; }
 .checkbox-label { display: flex; align-items: center; gap: 8px; }
-.checkbox-label input { width: 18px; height: 18px; }
+.checkbox-label input { inline-size: 18px; block-size: 18px; }
 .actions { display: flex; flex-direction: column; gap: 8px; }
 .hint { font-size: 13px; color: #555; }
-details { border-top: 1px solid #ccc; padding-top: 12px; }
+details { border-block-start: 1px solid #ccc; padding-block-start: 12px; }
+/*details:open summary {
+  margin-block-end: 1em;
+}*/
+details:open {
+  summary {
+    margin-block-end: 1em;
+  }
+  label {
+    margin-block-start: 12px;
+  }
+  select {
+    margin-block: 8px;
+  }
+}
 dl {
   font-size: 12px;
   font-family: ui-monospace;
 }
 dl div { display: flex; justify-content: space-between; gap: 12px; }
 dd { margin: 0; font-variant-numeric: tabular-nums; }
-.controls details label:not(.checkbox-label), .controls details input[type="range"], .controls details select { display: block; width: 100%; }
-.camera-feed { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
-.output-mode { display: block; padding: 0; max-width: none; }
-.output-mode .stage { width: 100vw; height: 100dvh; aspect-ratio: auto; }
+.controls details label:not(.checkbox-label), .controls details input[type="range"], .controls details select { display: block; inline-size: 100%; }
+.camera-feed { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); pointer-events: none; }
+.output-mode { display: block; padding: 0; max-inline-size: none; }
+.output-mode .stage { inline-size: 100vw; block-size: 100dvh; aspect-ratio: auto; }
 .restore-button {
-  position: absolute; width: 1px; height: 1px; min-height: 0;
+  position: absolute; inline-size: 1px; block-size: 1px; min-block-size: 0;
   padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 .restore-button:focus-visible {
-  top: 16px; left: 16px; width: auto; height: auto; min-height: 32px;
+  inset-block-start: 16px; inset-inline-start: 16px; inline-size: auto; block-size: auto; min-block-size: 32px;
   padding: 6px 12px; clip-path: none;
 }
 
-@media (max-width: 800px) {
+@media (max-inline-size: 800px) {
   .app:not(.output-mode) { grid-template-columns: minmax(0, 1fr); padding: 16px; }
 }

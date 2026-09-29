@@ -1,23 +1,33 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { createAvatarViewer, ViewerStats } from "./avatar-viewer";
 import { createFaceTracker, idleTrackingStatus } from "./face-tracker";
 import { defaultTrackingSettings } from "./face-rig";
 import type { TrackingSettings } from "./face-rig";
 import { drawCameraPreview } from "./camera-preview";
 
-const backgrounds = [
-  { value: "#243449", label: "ネイビー" },
-  { value: "#e8e5df", label: "ライトグレー" },
-  { value: "#00b140", label: "グリーン" },
-];
+const defaultBackground = "#00b140";
+const logTimeFormat = new Intl.DateTimeFormat("ja-JP", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+type StatusLogEntry = {
+  id: number;
+  time: string;
+  dateTime: string;
+  source: "Avatar" | "Camera";
+  message: string;
+  error: boolean;
+};
 
 function initialSettings() {
   const params = new URLSearchParams(window.location.search);
-  const background = backgrounds.find((item) => item.value === params.get("background"));
+  const background = params.get("background") ?? "";
   const zoom = Number(params.get("zoom") ?? 1);
   return {
     output: params.get("output") === "1",
-    background: background?.value ?? backgrounds[0].value,
+    background: /^#[0-9a-f]{6}$/i.test(background) ? background.toLowerCase() : defaultBackground,
     zoom: Number.isFinite(zoom) ? Math.min(2, Math.max(1, zoom)) : 1,
     dedicated: params.get("setup") === "1" || params.get("output") === "1",
   };
@@ -45,9 +55,28 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<ViewerStats | null>(null);
   const [visibility, setVisibility] = useState(document.visibilityState);
+  const [statusLog, setStatusLog] = useState<StatusLogEntry[]>(() => {
+    const now = new Date();
+    const time = logTimeFormat.format(now);
+    const dateTime = now.toISOString();
+    return [
+      { id: 1, time, dateTime, source: "Avatar", message: "VRM読み込み中", error: false },
+      {
+        id: 2,
+        time,
+        dateTime,
+        source: "Camera",
+        message: idleTrackingStatus.message,
+        error: false,
+      },
+    ];
+  });
+  const statusLogRef = useRef<HTMLDivElement>(null);
+  const followLogRef = useRef(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const cameraCanvasRef = useRef<HTMLCanvasElement>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
   const trackerRef = useRef<ReturnType<typeof createFaceTracker> | null>(null);
   const hideButtonRef = useRef<HTMLButtonElement>(null);
   const stageRef = useRef<HTMLElement>(null);
@@ -55,6 +84,31 @@ export default function App() {
   const optionsRef = useRef({ zoom, offsetX: position.x / 100, offsetY: position.y / 100 });
   const active = tracking.phase === "starting" || tracking.phase === "running";
   const currentBackgroundImage = backgroundImage?.file === backgroundFile ? backgroundImage : null;
+
+  const appendStatusLog = useCallback(
+    (source: StatusLogEntry["source"], message: string, error = false) => {
+      const now = new Date();
+      const time = logTimeFormat.format(now);
+      const dateTime = now.toISOString();
+      setStatusLog((current) => {
+        const last = current.findLast((entry) => entry.source === source);
+        // Tracking statistics update frequently; only retain message transitions.
+        if (last?.message === message && last.error === error) return current;
+        const entry = { id: (current.at(-1)?.id ?? 0) + 1, time, dateTime, source, message, error };
+        return [...current.slice(-99), entry];
+      });
+    },
+    [],
+  );
+
+  useLayoutEffect(() => {
+    if (output) {
+      followLogRef.current = true;
+      return;
+    }
+    const log = statusLogRef.current;
+    if (log && followLogRef.current) log.scrollTop = log.scrollHeight;
+  }, [statusLog, output]);
 
   useEffect(() => {
     if (!backgroundFile) return;
@@ -141,11 +195,15 @@ export default function App() {
       .then(({ createAvatarViewer }) => {
         if (cancelled) return;
         viewer = createAvatarViewer(canvas, {
-          onReady: () => setReady(true),
+          onReady: () => {
+            setReady(true);
+            appendStatusLog("Avatar", "VRM読み込み完了");
+          },
           onError: (message) => {
             trackerRef.current?.stop();
             setReady(false);
             setError(message);
+            appendStatusLog("Avatar", message, true);
           },
           onStats: setStats,
         });
@@ -153,14 +211,18 @@ export default function App() {
         viewerRef.current = viewer;
       })
       .catch(() => {
-        if (!cancelled) setError("3D表示のコードを読み込めませんでした。再読み込みしてください。");
+        if (!cancelled) {
+          const message = "3D表示のコードを読み込めませんでした。再読み込みしてください。";
+          setError(message);
+          appendStatusLog("Avatar", message, true);
+        }
       });
     return () => {
       cancelled = true;
       viewerRef.current = null;
       viewer?.dispose();
     };
-  }, []);
+  }, [appendStatusLog]);
 
   useEffect(() => {
     const options = { zoom, offsetX: position.x / 100, offsetY: position.y / 100 };
@@ -204,7 +266,10 @@ export default function App() {
     setPreviewError("");
     const tracker = createFaceTracker(video, {
       onPose: (pose) => viewerRef.current?.setPose(pose),
-      onStatus: setTracking,
+      onStatus: (status) => {
+        setTracking(status);
+        appendStatusLog("Camera", status.message, status.phase === "error");
+      },
       onCamera: (id) => {
         setCameraId(id);
         void refreshCameras();
@@ -401,7 +466,7 @@ export default function App() {
           <p className="hint">
             {active
               ? "緑のランドマークが検出結果です。映像の左右反転は「鏡像で動かす」に連動します。"
-              : "カメラを開始すると、映像と顔の検出点を表示します。"}
+              : "カメラを開始すると、映像と表情の検出点を表示します。"}
           </p>
           {previewError && <p role="alert">{previewError}</p>}
         </section>
@@ -409,15 +474,27 @@ export default function App() {
 
       {!output && (
         <section className="controls" aria-label="表示設定">
-          <div className="status">
-            <p role="status">
-              <span>Avatar: </span>
-              {error ? "読み込みエラー" : ready ? "読み込み完了" : "読み込み中"}
-            </p>
-            <p role={tracking.phase === "error" ? "alert" : "status"}>
-              <span>Camera: </span>
-              {tracking.message}
-            </p>
+          <div
+            ref={statusLogRef}
+            className="status"
+            role="log"
+            aria-label="動作ログ（最新100件）"
+            aria-live="polite"
+            aria-relevant="additions"
+            tabIndex={0}
+            onScroll={(event) => {
+              const log = event.currentTarget;
+              followLogRef.current = log.scrollHeight - log.scrollTop - log.clientHeight <= 16;
+            }}
+          >
+            {statusLog.map((entry) => (
+              <p key={entry.id} className={entry.error ? "status-error" : undefined}>
+                <time dateTime={entry.dateTime}>{entry.time}</time>{" "}
+                {/*<span>{entry.source}: </span>*/}
+                {entry.error && "エラー："}
+                {entry.message}
+              </p>
+            ))}
           </div>
           <label htmlFor="camera">カメラ</label>
           <select
@@ -528,54 +605,55 @@ export default function App() {
           </details>*/}
 
           <label htmlFor="background">背景色</label>
-          <select
+          <input
             id="background"
+            type="color"
             value={background}
             onChange={(event) => setBackground(event.target.value)}
-          >
-            {backgrounds.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
+          />
 
           <div className="actions">
             <label htmlFor="background-image">背景画像</label>
-            <input
+            <button
               id="background-image"
+              type="button"
+              aria-label={backgroundFile ? "背景画像を解除" : "背景画像を選択"}
+              aria-describedby="background-image-hint"
+              onClick={() => {
+                if (backgroundFile) clearBackground();
+                else backgroundInputRef.current?.click();
+              }}
+            >
+              {backgroundFile ? "背景画像を解除" : "背景画像を選択"}
+            </button>
+            <input
+              ref={backgroundInputRef}
               type="file"
               accept="image/png,image/jpeg,image/webp"
-              aria-describedby="background-image-hint"
+              hidden
               onChange={(event) => {
                 selectBackground(event.currentTarget.files?.[0]);
-                // Allow the same file to be selected again after removal or an error.
                 event.currentTarget.value = "";
               }}
             />
-            <p id="background-image-hint" className="hint">
-              PNG・JPEG・WebP、10MB以下。画像は送信・保存せず、再読み込みで解除されます。
-              縦横比を保って全体を埋め、はみ出す部分は切り取ります。
-            </p>
             {backgroundFile && (
-              <>
-                <p className="hint" role="status">
-                  {!currentBackgroundImage
-                    ? "背景画像を読み込んでいます…"
-                    : currentBackgroundImage.url
-                      ? `選択中：${backgroundFile.name}`
-                      : "画像を読み込めませんでした。別の画像を選択してください。"}
-                </p>
-                <button type="button" onClick={clearBackground}>
-                  背景画像を解除
-                </button>
-              </>
+              <p className="hint" role="status">
+                {!currentBackgroundImage
+                  ? "背景画像を読み込んでいます…"
+                  : currentBackgroundImage.url
+                    ? `選択中：${backgroundFile.name}`
+                    : "画像を読み込めませんでした。背景画像を解除して、別の画像を選択してください。"}
+              </p>
             )}
+            <p id="background-image-hint" className="hint">
+              PNG・JPEG・WebPの10MB以下のファイルを選択してください。画像は送信・保存せず、再読み込みで解除されます。
+            </p>
             {backgroundError && (
               <p className="hint" role="alert">
                 {backgroundError}
               </p>
             )}
+
             <label htmlFor="background-blur">背景のぼかし：{backgroundBlur}px</label>
             <input
               id="background-blur"
@@ -590,7 +668,7 @@ export default function App() {
               onChange={(event) => setBackgroundBlur(Number(event.currentTarget.value))}
             />
             <p id="background-blur-hint" className="hint">
-              背景画像だけをぼかします。端の透けを抑えるため、ぼかすほど背景を少し拡大します。
+              背景画像だけをぼかします。
             </p>
           </div>
 
@@ -608,7 +686,7 @@ export default function App() {
             このウィンドウの操作パネルとカメラ確認映像を隠します。顔追跡は継続します。ESCで戻せます。
           </p>
           {/*<details>
-            <summary>別ウィンドウで使う（任意）</summary>
+            <summary>別ウィンドウで開く</summary>
             <button type="button" onClick={openOutput} disabled={!ready || active}>専用ウィンドウを開く</button>
             <p className="hint">別の独立したアプリ画面を開きます。背景・表示サイズだけを引き継ぎ、カメラや基準値は共有しません。使う場合は現在のカメラを停止してから開き、新しいウィンドウでカメラ開始・基準合わせを行ってください。</p>
             <p className="hint">今のウィンドウをOBSで取り込む場合、この操作は不要です。</p>
@@ -676,7 +754,7 @@ export default function App() {
             </p>
           </details>
 
-          <details open>
+          <details>
             <summary>描画状況</summary>
             <dl>
               <div>
