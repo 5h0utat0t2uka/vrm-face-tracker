@@ -33,7 +33,14 @@ let
       url = "https://nodejs.org/dist/v${nodeVersion}/node-v${nodeVersion}-${nodePlatform.slug}.${nodePlatform.ext}";
       inherit (nodePlatform) hash;
     };
-    nativeBuildInputs = [ pkgs.gnutar ];
+    nativeBuildInputs = [
+      pkgs.gnutar
+    ] ++ pkgs.lib.optionals isLinux [
+      pkgs.autoPatchelfHook
+    ];
+    buildInputs = pkgs.lib.optionals isLinux [
+      pkgs.stdenv.cc.cc.lib
+    ];
     dontConfigure = true;
     dontBuild = true;
     installPhase = ''
