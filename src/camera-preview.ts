@@ -40,13 +40,13 @@ export function drawCameraPreview(
       context.moveTo(from.x * width, from.y * height);
       context.lineTo(to.x * width, to.y * height);
     }
-    context.strokeStyle = "#111";
-    context.lineWidth = 3;
-    context.stroke();
-    context.strokeStyle = "#50ff80";
+    // context.strokeStyle = "#000000";
+    // context.lineWidth = 0;
+    // context.stroke();
+    context.strokeStyle = "#00FEFC";
     context.lineWidth = 1;
     context.stroke();
-    context.fillStyle = "#50ff80";
+    context.fillStyle = "#00FF00";
     context.beginPath();
     for (const point of landmarks) {
       if (!valid(point)) continue;
