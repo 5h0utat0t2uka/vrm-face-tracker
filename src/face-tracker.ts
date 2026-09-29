@@ -18,7 +18,7 @@ export type TrackingStatus = {
 };
 export const idleTrackingStatus: TrackingStatus = {
   phase: "idle",
-  message: "停止しています",
+  message: "カメラは停止しています",
   face: false,
   fps: 0,
   inferenceMs: 0,
@@ -35,7 +35,7 @@ function cameraError(error: unknown) {
     if (error.name === "NotReadableError")
       return "カメラを使用できません。他のアプリでの使用状況や接続を確認してください。";
   }
-  return error instanceof Error ? error.message : "開始できませんでした。";
+  return error instanceof Error ? error.message : "カメラを開始できませんでした。";
 }
 
 export function createFaceTracker(
@@ -239,6 +239,7 @@ export function createFaceTracker(
     async start(deviceId: string) {
       if (started || stopped) return;
       started = true;
+      let stage: "camera" | "playback" | "tracking" = "camera";
       publish({ phase: "starting", message: "カメラの許可と顔検出の準備をしています…" });
       try {
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia)
@@ -280,8 +281,12 @@ export function createFaceTracker(
         video.srcObject = stream;
         video.muted = true;
         video.playsInline = true;
+        stage = "playback";
+        publish({ message: "カメラを取得しました。映像の再生を開始しています…" });
         await video.play();
         if (stopped) return;
+        stage = "tracking";
+        publish({ message: "カメラ映像の再生を開始しました。顔検出を準備しています…" });
         callbacks.onCamera(stream.getVideoTracks()[0]?.getSettings().deviceId ?? "");
         worker = new Worker(new URL("./face.worker.ts", import.meta.url), { type: "module" });
         const ready = waitForReady();
@@ -316,7 +321,19 @@ export function createFaceTracker(
         }, 500);
         void capture();
       } catch (error) {
-        if (!stopped) fail(cameraError(error));
+        if (stopped) return;
+        if (stage === "camera") fail(cameraError(error));
+        else if (stage === "playback") {
+          fail(
+            error instanceof DOMException && error.name === "NotAllowedError"
+              ? "カメラは取得できましたが、映像の再生が許可されていません。ブラウザのこのサイトの自動再生設定を確認してください。"
+              : `カメラ映像の再生に失敗しました。${error instanceof Error ? error.message : "再度開始してください。"}`,
+          );
+        } else {
+          fail(
+            `顔検出の準備に失敗しました。${error instanceof Error ? error.message : "再度開始してください。"}`,
+          );
+        }
       }
     },
     stop() {
