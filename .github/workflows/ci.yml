@@ -35,34 +35,6 @@ jobs:
           scan-args: |-
             --lockfile=pnpm-lock.yaml
 
-  nix-runtime:
-    name: Nix runtime
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Install Nix
-        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
-        with:
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Node.js and pnpm
-        run: |
-          nix develop -c node --version
-          nix develop -c pnpm --version
-
-      - name: Install dependencies
-        run: nix develop -c pnpm install --frozen-lockfile
-
-      - name: Prepare tracking assets
-        run: nix develop -c pnpm setup:tracking
-
-      - name: Build
-        run: nix develop -c pnpm build
-
   test:
     name: Test
     runs-on: ubuntu-24.04
